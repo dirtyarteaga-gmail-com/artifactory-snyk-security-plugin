@@ -36,22 +36,16 @@ mvn install -DskipTests
 Will probably work. Per default, you'll find a baked `.zip`
 in `~/.m2/repository/io/snyk/plugins/artifactory-snyk-security-plugin/LOCAL-SNAPSHOT`.
 
-Unzip it. Inside is a `.groovy` file, a `.properties` file, as well as the actual `.jar` inside `/lib`.
-
-Edit the `.properties`, add something like this to the properties for a minimum working solution:
+Edit the `.properties` file to something like:
 
 ```
 snyk.api.token=<INSERT_TOKEN>
 snyk.api.organization=<INSERT_ORG_ID>
-```
-
-Also, if you want to test against your local Registry, but you're running on Docker:
-
-```
 snyk.api.url=http://host.docker.internal:8000/api/v1/
 ```
 
-At least if you're on OSX, you cannot probe against `localhost` from within a Docker container.
+The latter if you want to debug against a local registry. At least if you're on OSX, you cannot probe
+against `localhost` from within a Docker container.
 
 Also, remember to activate some of the scanners depending on what you're debugging:
 
