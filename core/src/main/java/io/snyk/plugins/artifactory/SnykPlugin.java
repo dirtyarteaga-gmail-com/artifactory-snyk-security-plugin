@@ -9,20 +9,16 @@ import io.snyk.plugins.artifactory.exception.SnykRuntimeException;
 import io.snyk.plugins.artifactory.scanner.ScannerModule;
 import io.snyk.sdk.SnykConfig;
 import io.snyk.sdk.api.v1.SnykClient;
-import io.snyk.sdk.api.v1.SnykResult;
-import io.snyk.sdk.model.NotificationSettings;
 import org.artifactory.exception.CancelException;
 import org.artifactory.fs.ItemInfo;
 import org.artifactory.repo.RepoPath;
 import org.artifactory.repo.Repositories;
 import org.artifactory.security.User;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.io.File;
-import java.net.http.HttpRequest;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.Properties;
@@ -35,12 +31,9 @@ public class SnykPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(SnykPlugin.class);
   private static final String API_USER_AGENT = "snyk-artifactory-plugin/";
 
-  private ConfigurationModule configurationModule;
-  private AuditModule auditModule;
-  private ScannerModule scannerModule;
-
-  SnykPlugin() {
-  }
+  private final ConfigurationModule configurationModule;
+  private final AuditModule auditModule;
+  private final ScannerModule scannerModule;
 
   public SnykPlugin(@Nonnull Repositories repositories, File pluginsDirectory) {
     try {
@@ -51,15 +44,7 @@ public class SnykPlugin {
       validateConfiguration();
 
       LOG.info("Creating api client and modules...");
-      LOG.info("BaseURL:" + configurationModule.getPropertyOrDefault(API_URL));
-      LOG.info("Organization:" + configurationModule.getPropertyOrDefault(API_ORGANIZATION));
-      String token = configurationModule.getPropertyOrDefault(API_TOKEN);
-      if (null != token && token.length() > 4) {
-        token = token.substring(0, 4) + "...";
-      } else {
-        token = "no token configured";
-      }
-      LOG.info("Token:" + token);
+
       final SnykClient snykClient = createSnykClient(configurationModule, pluginVersion);
 
       auditModule = new AuditModule();
@@ -124,11 +109,11 @@ public class SnykPlugin {
 
     LOG.debug("Snyk Plugin Configuration:");
     configurationModule.getPropertyEntries().stream()
-      .filter(entry -> !API_TOKEN.propertyKey().equals(entry.getKey()))
-      .filter(entry -> !API_ORGANIZATION.propertyKey().equals(entry.getKey()))
-      .map(entry -> entry.getKey() + "=" + entry.getValue())
-      .sorted()
-      .forEach(LOG::debug);
+                       .filter(entry -> !API_TOKEN.propertyKey().equals(entry.getKey()))
+                       .filter(entry -> !API_ORGANIZATION.propertyKey().equals(entry.getKey()))
+                       .map(entry -> entry.getKey() + "=" + entry.getValue())
+                       .sorted()
+                       .forEach(LOG::debug);
   }
 
   private SnykClient createSnykClient(@Nonnull ConfigurationModule configurationModule, String pluginVersion) throws Exception {
@@ -171,42 +156,17 @@ public class SnykPlugin {
 
     String org = configurationModule.getPropertyOrDefault(API_ORGANIZATION);
     var res = snykClient.getNotificationSettings(org);
-    handleResponse(res);
-
-    return snykClient;
-  }
-
-  void handleResponse(SnykResult<NotificationSettings> res) {
     if (res.isSuccessful()) {
       LOG.info("Snyk token check successful - response status code {}", res.statusCode);
     } else {
-      String info = "";
-      if (null != res.response) {
-        HttpRequest request = res.response.request();
-        info += "\nRequest URI: " + request.uri();
-        info += "\nRequest Headers: " + sanitizeHeaders(request);
-        info += "\nResponse Status: " + res.response.statusCode();
-        info += "\nResponse Body: " + res.response.body();
-      }
-      LOG.warn("Snyk token check unsuccessful - response status code {}{}", res.statusCode, info);
+      LOG.warn("Snyk token check unsuccessful - response status code {}", res.statusCode);
       if (res.statusCode == 401) {
-        throw new SnykRuntimeException(format("%s is not valid.%s", API_TOKEN.propertyKey(), info));
+        throw new SnykRuntimeException(format("%s is not valid.", API_TOKEN.propertyKey()));
       } else {
-        throw new SnykRuntimeException(format("%s could not be verified.%s", API_TOKEN.propertyKey(), info));
+        throw new SnykRuntimeException(format("%s could not be verified.", API_TOKEN.propertyKey()));
       }
     }
-  }
 
-  @NotNull
-  static String sanitizeHeaders(HttpRequest request) {
-    Optional<String> authorization = request.headers().firstValue("Authorization");
-    if (authorization.isPresent()) {
-      String header = authorization.get();
-      if (header.contains("token") && header.length() > 10) {
-        String maskedAuthHeader = header.substring(0, 10) + "...";
-        return request.headers().toString().replace(header, maskedAuthHeader);
-      }
-    }
-    return request.headers().toString();
+    return snykClient;
   }
 }

@@ -13,20 +13,16 @@ public class SnykResult<T> {
   public int statusCode;
   public Optional<T> result = Optional.empty();
   public Optional<String> responseAsText = Optional.empty();
-  public HttpResponse<String> response;
   private static final Logger LOG = LoggerFactory.getLogger(SnykResult.class);
 
-  public SnykResult(int statusCode, T result, String responseBody, HttpResponse<String> response) {
+  public SnykResult(int statusCode, T result, String responseBody) {
     this.statusCode = statusCode;
     this.result = Optional.of(result);
     this.responseAsText = Optional.of(responseBody);
-    this.response = response;
   }
 
-  public SnykResult(HttpResponse<String> response) {
-    this.statusCode = response.statusCode();
-    this.responseAsText = Optional.of(response.body());
-    this.response = response;
+  public SnykResult(int statusCode) {
+    this.statusCode = statusCode;
   }
 
   public Optional<T> get() {
@@ -43,9 +39,14 @@ public class SnykResult<T> {
       String responseBody = response.body();
       ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
       var res = objectMapper.readValue(responseBody, resultType);
-      return new SnykResult<>(status, res, responseBody, response);
+      return new SnykResult<>(status, res, responseBody);
     } else {
-      return new SnykResult<>(response);
+      LOG.error("HTTP error status received. Status: " + status);
+      LOG.error("HTTP error status received. Response: " + response.body());
+      LOG.error("HTTP Request method: " + response.request().method());
+      LOG.error("HTTP Request uri: " + response.request().uri());
+      LOG.debug("HTTP Request headers: " + response.request().headers().toString());
+      return new SnykResult<>(status);
     }
   }
 }
